@@ -1,9 +1,13 @@
 #include<mutex>
 #include<condition_variable>
 
-class RWMutex{
+class RWMutex final {
 public:
-    RWMutex() : m_readReqCnt(0U), m_writeReqCnt(0U), m_writing(false)/*, m_refCount(1U)*/ {}
+    enum RWLockType {
+        READ_LOCK,
+        WRITE_LOCK
+    };
+    RWMutex() : m_readReqCnt(0U), m_writeReqCnt(0U), m_writing(false) {}
     RWMutex(RWMutex&& another) = delete;
     RWMutex& operator= (RWMutex&& another) = delete;
     RWMutex(const RWMutex& another) = delete;
@@ -36,11 +40,45 @@ public:
     }
 
 private:
-
-//    unsigned int m_refCount;
+    void* operator new(size_t);
+    void* operator new(size_t, void*);
+    void* operator new[](size_t);
+    void* operator new[](size_t, void*);
+    //Private all new operator
     std::mutex m_mutex;
     std::condition_variable m_cv;
     unsigned int m_readReqCnt;
     unsigned int m_writeReqCnt;
     bool m_writing;
+};
+
+class RWLockGuard final {
+public:
+    explicit RWLockGuard(RWMutex& mutex, RWMutex::RWLockType lockType = RWMutex::READ_LOCK) : m_mutex(mutex), m_type(lockType) {
+        if(m_type == RWMutex::READ_LOCK) {
+            m_mutex.ReadLock();
+        } else {
+            m_mutex.WriteLock();
+        }
+    }
+    RWLockGuard(const RWLockGuard& another) = delete;
+    RWLockGuard(RWLockGuard&& another) = delete;
+    RWLockGuard& operator= (const RWLockGuard& another) = delete;
+    RWLockGuard& operator= (RWLockGuard&& another) = delete;
+
+    ~RWLockGuard() {
+        if(m_type == RWMutex::READ_LOCK) {
+            m_mutex.ReadUnlock();
+        } else {
+            m_mutex.WriteUnlock();
+        }
+    }
+
+private:
+    void* operator new(size_t);
+    void* operator new(size_t, void*);
+    void* operator new[](size_t);
+    void* operator new[](size_t, void*);
+    RWMutex& m_mutex;
+    const RWMutex::RWLockType m_type;
 };
